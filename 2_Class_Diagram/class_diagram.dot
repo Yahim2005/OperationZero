@@ -1,0 +1,128 @@
+digraph OperationZero {
+  graph [rankdir=TB, fontname="Helvetica", fontsize=26, labelloc=t, label="Operation Zero - Class Diagram (Java game controller)", nodesep=0.35, ranksep=0.85, pad=0.4, splines=true, compound=true];
+  node  [shape=record, fontname="Helvetica", fontsize=11, style=filled, fillcolor="#FFFFFF", color="#1f2d5a", margin="0.10,0.06"];
+  edge  [fontname="Helvetica", fontsize=10, color="#1f2d5a"];
+
+  // ---------------- entry and control ----------------
+  Main [label="{Main|+ USE_SIMULATOR : boolean\l+ PORT : String\l+ CARD_IDS : String[]\l+ USE_JOYSTICK, USE_ALIGNMENT : boolean\l|+ main(args) : void\l}", fillcolor="#E8F0FF"];
+
+  GameController [label="{GameController|- link : SerialLink\l- cardIds : String[]\l- leaderboard : Leaderboard\l- stability : StabilityMonitor\l- queue : BlockingQueue\<Runnable\>\l- observers : List\<GameObserver\>\l- state : GameState\l- session : GameSession\l|+ addObserver(o) : void\l+ requestStart(name) : void\l+ start() : void\l- begin(name) : void\l- handleLine(line) : void\l- beginRound() : void\l- tick() : void\l- finish(end, msg) : void\l- publish() : void\l}", fillcolor="#FFF2CC"];
+
+  GameSession [label="{GameSession|+ player : Player\l+ config : BombConfiguration\l+ modules : List\<BombModule\>\l+ cal : Calibration\l+ strikes : int\l+ activeIndex : int\l+ startMs : long\l|+ active() : BombModule\l+ allComplete() : boolean\l}"];
+
+  BombConfiguration [label="{BombConfiguration|+ timeLimitMs : long = 180000\l+ requiredCard : int\l+ question : String\l+ detonatorSequence : int[4]\l+ rhythm : boolean[3]\l+ mazeSeed : long\l+ alignTarget : int\l+ codeClue, code : String\l|+ createModules(cardIds,\l    useJoystick, useAlignment)\l    : List\<BombModule\>\l}"];
+
+  Clues [label="{Clues|+ QUESTIONS : String[][]\l+ DEAD_DIGITS : String\l|+ question(r, colour) : String\l+ codeClue(r) : String[]\l}"];
+
+  Player [label="{Player|+ id : int\l+ name : String\l}"];
+  Calibration [label="{Calibration|+ jx0, jy0 : int\l+ ax0, ay0 : int\l}"];
+  StabilityMonitor [label="{StabilityMonitor|- level : int\l- jumps : int[]\l|+ update(e, cal) : boolean\l+ getLevel() : int\l+ reset() : void\l}", fillcolor="#FDE9E7"];
+  Sound [label="{\<\<Singleton\>\>\nSound|- INSTANCE : Sound\l- link : SerialLink\l|+ get() : Sound\l+ attach(link) : void\l+ beep(hz, ms) : void\l+ melody(hz[], ms[]) : void\l+ strike(), success(),\l  victory(), explosion() : void\l}", fillcolor="#FDE9E7"];
+
+  // ---------------- data ----------------
+  SensorEvent [label="{SensorEvent|+ type : char\l+ enc, jx, jy, ax, ay, cm : int\l+ text : String\l+ time : long\l|+ parse(line) : SensorEvent\l}"];
+  Snapshot [label="{Snapshot|+ state : GameState\l+ message, player : String\l+ remainingMs : long\l+ strikes, stability : int\l+ instruction : String\l+ scene : String[]\l+ moduleNames, status : String[]\l+ progress : int[]\l+ leaderboardText : String\l}"];
+  GameResult [label="{GameResult|+ name : String\l+ outcome : Outcome\l+ elapsedMs, adjustedMs : long\l+ strikes, score : int\l+ configId : long\l|+ toString() : String\l}"];
+  Leaderboard [label="{Leaderboard|- fileName : String\l- results : List\<GameResult\>\l|+ add(r) : void\l+ save() : void\l+ toText() : String\l- load() : void\l}"];
+  GameState [label="{\<\<enumeration\>\>\nGameState|READY\lWAITING_DEVICE\lCALIBRATING\lRUNNING\lREADY_TO_DEFUSE\lDEFUSED\lFAILED\lINTERRUPTED\l}", fillcolor="#EFEFEF"];
+  ModuleResult [label="{\<\<enumeration\>\>\nModuleResult|NONE\lSTRIKE\lCOMPLETE\l}", fillcolor="#EFEFEF"];
+
+  // ---------------- serial link (Strategy) ----------------
+  SerialLink [label="{\<\<interface\>\>\nSerialLink|+ send(line) : void\l+ readLine() : String\l+ close() : void\l}", fillcolor="#E2F4E2"];
+  HardwareLink [label="{HardwareLink|- port : SerialPortHandle\l|+ send(line) : void\l+ readLine() : String\l+ close() : void\l}"];
+  SimLink [label="{SimLink|- incoming : BlockingQueue\<String\>\l- streaming : boolean\l- sliders : JSlider\l|+ send(line) : void\l+ readLine() : String\l- buildWindow(cardIds) : void\l}"];
+  SerialPortHandle [label="{SerialPortHandle|~ sp : jssc.SerialPort\l~ path : String\l|+ readLine() : String\l+ printLine(s) : void\l}"];
+
+  // ---------------- mini-games (Strategy + Template Method) ----------------
+  BombModule [label="{\<\<interface\>\>\nBombModule|+ getName() : String\l+ getInstruction() : String\l+ processInput(e, cal) : ModuleResult\l+ isComplete() : boolean\l+ getProgress() : int\l+ getStatus() : String\l+ reset() : void\l+ getScene() : String[]\l}", fillcolor="#E2F4E2"];
+  HoldModule [label="{\<\<abstract\>\>\nHoldModule|# holdMs, holdStart : long\l# graceMs : long = 600\l# complete : boolean\l|+ processInput(e, cal) : ModuleResult\l# inRange(e, cal) : boolean \{abstract\}\l}", fillcolor="#E2F4E2"];
+  RFIDModule [label="{RFIDModule\n(1 Security Authorization)|- cardIds : String[]\l- required : int\l- question : String\l|+ processInput(e, cal)\l}"];
+  DetonatorModule [label="{DetonatorModule\n(2 Detonator)|- sequence : int[]\l- showing : boolean\l- pos : int\l|+ processInput(e, cal)\l}"];
+  RhythmModule [label="{RhythmModule\n(3 Rhythm Lock)|- longGap : boolean[]\l- phase, taps : int\l|+ processInput(e, cal)\l- startPlayback(t) : void\l}"];
+  MazeModule [label="{MazeModule\n(4 Ghost Hunt)|- wall, pellet : boolean[][]\l- pr, pc, gr, gc : int\l- eaten : int\l|+ processInput(e, cal)\l+ getScene() : String[]\l- moveGhost() : void\l}"];
+  AlignmentModule [label="{AlignmentModule\n(5 Radar Lock)|- target : int\l- lastBeep : long\l|# inRange(e, cal) : boolean\l}"];
+  KeypadModule [label="{KeypadModule\n(6 Override Code)|- code, clue : String\l- entered : StringBuilder\l|+ processInput(e, cal)\l}"];
+  Legacy [label="{OrientationModule, JoystickModule,\lPowerDialModule\l(early modules, not used in the\l final 6-game flow)|# inRange(e, cal) : boolean\l}", fillcolor="#EFEFEF"];
+
+  // ---------------- user interface (Observer) ----------------
+  GameObserver [label="{\<\<interface\>\>\nGameObserver|+ update(s : Snapshot) : void\l}", fillcolor="#E2F4E2"];
+  GameView [label="{GameView\n(extends JFrame)|- controller : GameController\l- nameField : JTextField\l- startButton : RetroButton\l- screen : ArcadePanel\l|+ update(s) : void\l- apply(s) : void\l}", fillcolor="#F3E8FF"];
+  ArcadePanel [label="{ArcadePanel\n(extends JPanel)|- screen : BufferedImage\l- snapshot : Snapshot\l|+ show(s) : void\l# paintComponent(g) : void\l}", fillcolor="#F3E8FF"];
+  ArcadeRenderer [label="{ArcadeRenderer|+ W = 420, H = 240 : int\l+ BLACK, BLUE, YELLOW, WHITE : Color\l|+ render(g, s, now) : void\l- drawModules(), drawMaze(),\l  drawLeaderboard() : void\l+ drawPac(), drawGhost() : void\l}", fillcolor="#F3E8FF"];
+  BitmapFont [label="{BitmapFont|- GLYPHS : int[][]\l|+ draw(g, text, x, y, scale, color)\l+ drawCentered(...) : void\l+ width(text, scale) : int\l+ wrap(text, maxChars) : List\<String\>\l}", fillcolor="#F3E8FF"];
+
+  // ---------------- relationships ----------------
+  // Main
+  Main -> GameController [label="creates", style=dashed, arrowhead=vee];
+  Main -> GameView [label="creates", style=dashed, arrowhead=vee];
+  Main -> Leaderboard [style=dashed, arrowhead=vee];
+  Main -> SerialLink [style=dashed, arrowhead=vee, label="chooses"];
+
+  // controller
+  GameController -> SerialLink [label="link", arrowhead=vee];
+  GameController -> GameSession [label="session\n0..1", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameController -> StabilityMonitor [label="1", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameController -> Leaderboard [label="leaderboard", arrowhead=vee];
+  GameController -> GameObserver [label="observers\n0..*", arrowhead=vee, dir=both, arrowtail=odiamond];
+  GameController -> Snapshot [label="publishes", style=dashed, arrowhead=vee];
+  GameController -> SensorEvent [label="parses", style=dashed, arrowhead=vee];
+  GameController -> BombConfiguration [label="creates", style=dashed, arrowhead=vee];
+  GameController -> Sound [label="uses", style=dashed, arrowhead=vee];
+  GameController -> GameState [style=dashed, arrowhead=vee];
+  GameController -> GameResult [label="creates", style=dashed, arrowhead=vee];
+
+  // session
+  GameSession -> Player [label="1", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameSession -> BombConfiguration [label="1", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameSession -> Calibration [label="1", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameSession -> BombModule [label="modules\n6", dir=both, arrowtail=diamond, arrowhead=vee];
+  BombConfiguration -> Clues [style=dashed, arrowhead=vee, label="uses"];
+  BombConfiguration -> BombModule [style=dashed, arrowhead=vee, label="creates"];
+
+  // leaderboard
+  Leaderboard -> GameResult [label="results\n0..*", dir=both, arrowtail=diamond, arrowhead=vee];
+
+  // serial link
+  HardwareLink -> SerialLink [arrowhead=onormal, style=dashed];
+  SimLink -> SerialLink [arrowhead=onormal, style=dashed];
+  HardwareLink -> SerialPortHandle [label="port", dir=both, arrowtail=diamond, arrowhead=vee];
+  Sound -> SerialLink [label="sends notes", arrowhead=vee];
+
+  // modules
+  HoldModule -> BombModule [arrowhead=onormal, style=dashed];
+  RFIDModule -> BombModule [arrowhead=onormal, style=dashed];
+  DetonatorModule -> BombModule [arrowhead=onormal, style=dashed];
+  RhythmModule -> BombModule [arrowhead=onormal, style=dashed];
+  MazeModule -> BombModule [arrowhead=onormal, style=dashed];
+  KeypadModule -> BombModule [arrowhead=onormal, style=dashed];
+  AlignmentModule -> HoldModule [arrowhead=onormal];
+  Legacy -> HoldModule [arrowhead=onormal];
+  BombModule -> SensorEvent [style=dashed, arrowhead=vee, label="reads"];
+  BombModule -> ModuleResult [style=dashed, arrowhead=vee, label="returns"];
+  DetonatorModule -> Sound [style=dashed, arrowhead=vee];
+  RhythmModule -> Sound [style=dashed, arrowhead=vee];
+  MazeModule -> Sound [style=dashed, arrowhead=vee];
+  AlignmentModule -> Sound [style=dashed, arrowhead=vee];
+  StabilityMonitor -> Sound [style=dashed, arrowhead=vee];
+
+  // UI
+  GameView -> GameObserver [arrowhead=onormal, style=dashed];
+  GameView -> ArcadePanel [label="screen", dir=both, arrowtail=diamond, arrowhead=vee];
+  GameView -> GameController [label="requestStart()", arrowhead=vee];
+  ArcadePanel -> ArcadeRenderer [style=dashed, arrowhead=vee, label="render()"];
+  ArcadePanel -> Snapshot [arrowhead=vee, label="shows"];
+  ArcadeRenderer -> BitmapFont [style=dashed, arrowhead=vee];
+  ArcadeRenderer -> Snapshot [style=dashed, arrowhead=vee];
+  Snapshot -> GameState [arrowhead=vee];
+
+  // legend
+  Legend [shape=plaintext, style="", label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="2" CELLPADDING="3" COLOR="#1f2d5a">
+    <TR><TD ALIGN="LEFT"><B>Legend</B></TD></TR>
+    <TR><TD ALIGN="LEFT">solid hollow-triangle arrow = inheritance (extends)</TD></TR>
+    <TR><TD ALIGN="LEFT">dashed hollow-triangle arrow = realisation (implements)</TD></TR>
+    <TR><TD ALIGN="LEFT">filled diamond = composition (owns), hollow diamond = aggregation</TD></TR>
+    <TR><TD ALIGN="LEFT">solid open arrow = association, dashed open arrow = dependency (uses/creates)</TD></TR>
+    <TR><TD ALIGN="LEFT">Patterns: Observer (GameObserver), Strategy (SerialLink, BombModule),</TD></TR>
+    <TR><TD ALIGN="LEFT">Template Method (HoldModule), Singleton (Sound)</TD></TR>
+  </TABLE>>];
+}
